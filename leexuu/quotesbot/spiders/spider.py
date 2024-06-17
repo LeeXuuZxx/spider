@@ -16,7 +16,7 @@ class Spider(scrapy.Spider):
         # 'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
         # 'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
         # 'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
-        'okx': 'https://www.okx.com/zh-hans/help/section/announcements-api', #未爬取
+        # 'okx': 'https://www.okx.com/zh-hans/help/section/announcements-api', #未爬取
         # 'gate': 'https://www.gate.io/zh/announcements',
         # 'bitget': 'https://www.bitget.com/zh-CN/support/categories/11865590960081', #未爬取
         'bitget': 'https://www.bitget.com/zh-CN/academy'
@@ -197,7 +197,6 @@ class Spider(scrapy.Spider):
         # 打印或保存 article_urls 字典
         logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
         logger.info(f"{exchange}: Article URLs: {self.article_urls[exchange]}")
-
 
 if __name__ == "__main__":
     process = CrawlerProcess()
