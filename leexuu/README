@@ -1,0 +1,6 @@
+目录
+/root/spider/leexuu
+运行并打日志
+scrapy crawl Spider 2>&1 | tee output.log
+运行
+scrapy crawl Spider

@@ -4,65 +4,283 @@ import json
 from urllib.parse import quote
 from scrapy.crawler import CrawlerProcess
 from loguru import logger
-
-
+import requests
+from bs4 import BeautifulSoup
+import csv
+import time
+from ctx.telegram import Telegram
 
 class Spider(scrapy.Spider):
     name = "Spider"
 
-    allowed_domains = ['bitget.com']
-
     urls = {
-        # 'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
-        # 'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
-        # 'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
-        # 'okx': 'https://www.okx.com/zh-hans/help/section/announcements-api', #未爬取
-        # 'gate': 'https://www.gate.io/zh/announcements',
-        # 'bitget': 'https://www.bitget.com/zh-CN/support/categories/11865590960081', #未爬取
-        'bitget': 'https://www.bitget.com/zh-CN/academy'
-        # 'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
-        # 'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
+        'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
+        'binance_api': 'https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/CHANGELOG',
+        'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
+        'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
+        'okx_api': 'https://www.okx.com/docs-v5/log_zh/#upcoming-changes-copy-trading-restriction-fucntion',
+        'gate': 'https://www.gate.io/zh/announcements',
+        'gate_api': 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81',
+        'bitget': 'https://api.bitget.com/api/v2/public/annoucements',
+        'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
+        'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
+        'bybit_api': 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5',
     }
 
     custom_settings = {
         'USER_AGENT': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'DOWNLOAD_DELAY': 3,  # Add a delay to avoid detection
         'RANDOMIZE_DOWNLOAD_DELAY': True,
-        'DOWNLOADER_MIDDLEWARES': {
-            'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
-            'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400,
-            'scrapy.downloadermiddlewares.retry.RetryMiddleware': 90,
-            'scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware': 110,
-        },
+        # 'DOWNLOADER_MIDDLEWARES': {
+        #     'scrapy.downloadermiddlewares.useragent.UserAgentMiddleware': None,
+        #     'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400,
+        #     'scrapy.downloadermiddlewares.retry.RetryMiddleware': 90,
+        #     'scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware': 110,
+        # },
         'RETRY_TIMES': 5,
         'RETRY_HTTP_CODES': [403, 429],
         'HTTPERROR_ALLOWED_CODES': [403],
-
     }
     
+    TELEGRAM_BOT_TOKEN = '7283290474:AAHnBvxcxlYqQFBa4r2RjykTee8H6eQAgSQ'
+    TELEGRAM_CHAT_ID = '2115436972'
+    telegram = Telegram(token=TELEGRAM_BOT_TOKEN,chat_id=TELEGRAM_CHAT_ID)
 
     # 用于存储公告URL的字典，避免重复
-    article_urls = {'binance': {}, 'okx': {}, 'okx_announcements-api': {}, 'gate': {}, 'bitget': {}, 'bybit': {}, 'bybit_delist': {}}
+    article_urls = {'binance': {}, 'binance_api': {}, 'okx': {}, 'okx_announcements-api': {}, 'okx_api': {}, 'gate': {}, 'gate_api': {}, 'bitget': {}, 'bybit': {}, 'bybit_delist': {}, 'bybit_api': {}}
 
     def start_requests(self):
-        for exchange, url in self.urls.items():
-            yield scrapy.Request(url=url, callback=self.parse, meta={'exchange': exchange}, headers={
-                'Referer': 'https://www.google.com/',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Connection': 'keep-alive',
-            })
+        while True:
+            for exchange, url in self.urls.items():
+                if exchange == 'bitget':
+                    self.bitget(url)
+                    time.sleep(10)
+                    # logger.info(f"已爬取 {exchange} 公告")
+                    # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                    # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+                else:
+                    yield scrapy.Request(url=url, callback=self.parse, meta={'exchange': exchange}, headers={
+                        'Referer': 'https://www.google.com/',
+                        'Accept-Language': 'en-US,en;q=0.9',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                        'Connection': 'keep-alive',
+                    })
+                    time.sleep(10)
+                    # logger.info(f"已爬取 {exchange} 公告")
+                    # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
+
+    def bitget(self, url):
+        params = {'language': 'zh_CN'}
+        try:
+            exchange = 'bitget'
+            response = requests.get(url, params=params)
+            if response.status_code == 200:
+                data = response.json()
+                announcements = data.get('data', [])
+                for announcement in announcements:
+                    title = announcement.get('annTitle', '')
+                    if title not in self.article_urls['bitget']:
+                        self.article_urls['bitget'][title] = announcement.get('annUrl', '')
+            else:
+                print(f"Request failed with status code {response.status_code}")
+
+            # 打印或保存 article_urls 字典
+            # logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
+            # logger.info(f"{exchange}: Article URLs: {self.article_urls[exchange]}")
+
+        except requests.exceptions.RequestException as e:
+            print(f"Request error: {e}")
+                    
     def parse(self, response):
         exchange = response.meta['exchange']
 
-        if exchange == 'bitget':
-            app_data_selector = 'div.ArticleList_actice_main__qlrgF'
+        if exchange == 'bybit_api':
+            app_data_selector = 'div.row'
             app_data_text = response.css(app_data_selector).extract()
-            logger.info(app_data_text)
             if not app_data_text:
-                logger.error("No data found")
+                logger.error(f"No data found for {exchange}")
                 return
+            app_data_text = ''.join(app_data_text)
+            soup = BeautifulSoup(app_data_text, 'html.parser')
+            
+            base_url = 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5'
+            
+            for h2_tag in soup.find_all('h2'):
+                current_date = h2_tag.get_text(strip=True)
+                # logger.info(current_date)
+                
+                sibling = h2_tag.find_next_sibling()
+                while sibling and sibling.name != 'h2':
+                    if sibling.name == 'h3':
+                        section = sibling.get_text(strip=True)
+                        # logger.info(section)
+                        ul_tag = sibling.find_next('ul')
+                        if ul_tag:
+                            for li_tag in ul_tag.find_all('li'):
+                                title_content = li_tag.get_text(strip=True)
+                                a_tag = li_tag.find('a', href=True)
+                                if a_tag:
+                                    title = f"{current_date} {section} {title_content}"
+                                    url = base_url
+                                    if title not in self.article_urls[exchange]:
+                                        self.article_urls[exchange][title] = url
+                    sibling = sibling.find_next_sibling()
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+
+        if exchange == 'gate_api':
+            app_data_selector = 'div.content-block__cont'
+            app_data_text = response.css(app_data_selector).extract()
+            # logger.info(app_data_text)
+
+            if not app_data_text:
+                logger.error(f"No data found for {exchange}")
+                return
+            app_data_text = ''.join(app_data_text)
+            try:
+                soup = BeautifulSoup(app_data_text, 'html.parser')
+                current_date = None
+                for p_tag in soup.find_all('p'):
+                    strong_tag = p_tag.find('strong')
+                    if strong_tag:
+                        version = p_tag.get_text(strip=True)
+                        date_tag = p_tag.find_next_sibling('p')
+                        if date_tag:
+                            current_date = date_tag.get_text(strip=True)
+                        ul_tag = p_tag.find_next('ul')
+                        if ul_tag:
+                            for li_tag in ul_tag.find_all('li'):
+                                title = f"{current_date} {li_tag.get_text(strip=True)}"
+                                url = 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81'
+                                if title not in self.article_urls['gate_api']:
+                                    self.article_urls['gate_api'][title] = url
+                logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+
+                # logger.info(self.article_urls['gate_api'])
+
+            except Exception as e:
+                logger.error(f"Error parsing HTML: {e}")
+
+        if exchange == 'binance_api':
+            app_data_selector = 'div.markdown'
+            app_data_text = response.css(app_data_selector).extract()
+            if not app_data_text:
+                logger.error(f"No data found for {exchange}")
+                return
+            # 将列表中的HTML内容合并为一个字符串
+            app_data_text = ''.join(app_data_text)
+            try:
+                # 使用BeautifulSoup解析HTML
+                soup = BeautifulSoup(app_data_text, 'html.parser')
+                # 初始化变量来存储当前日期和标题信息
+                current_date = None
+                first_date_found = False
+                # 找到所有的<h1>标签和<ul>标签
+                for element in soup.find_all(['h1', 'ul']):
+                    if element.name == 'h1':
+                        if not first_date_found:
+                            current_date = element.get_text(strip=True)
+                            # logger.info(f"Current date: {current_date}")
+                            first_date_found = True
+                        else:
+                            break
+                        if current_date not in self.article_urls['binance_api']:
+                            title = current_date
+                            url = 'https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/CHANGELOG'
+                            if title not in self.article_urls['binance_api']:
+                                self.article_urls['binance_api'][title] = url
+                logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                
+                # 打印或保存 article_urls 字典
+                # logger.info(f"binance_api: Total unique articles: {len(self.article_urls['binance_api'])}")
+                # logger.info(f"binance_api: Article URLs: {self.article_urls['binance_api']}")
+            except Exception as e:
+                logger.error(f"Error parsing HTML: {e}")
+
+        if exchange == 'okx_api':
+            app_data_selector = 'div.content'
+            app_data_text = response.css(app_data_selector).extract()
+            # logger.info(app_data_text)
+            if not app_data_text:
+                logger.error(f"No data found for {exchange}")
+                return
+            
+            # 将列表中的HTML内容合并为一个字符串
+            app_data_text = ''.join(app_data_text)
+            try:
+                # 使用BeautifulSoup解析HTML
+                soup = BeautifulSoup(app_data_text, 'html.parser')
+
+                # 初始化变量来存储当前日期和标题信息
+                current_date = None
+                current_title = None
+
+                # 找到所有的<h1>标签和<ul>标签
+                for h1_tag in soup.find_all('h1'):
+                    if h1_tag.has_attr('id'):
+                        current_date = h1_tag['id']  # 获取日期
+                        current_title = h1_tag.text.strip()  # 获取标题
+
+                    # 查找当前日期下的所有新增接口链接
+                    ul_tag = h1_tag.find_next('ul')
+                    if ul_tag:
+                        for li_tag in ul_tag.find_all('li'):
+                            a_tag = li_tag.find('a')
+                            if a_tag:
+                                title = current_title + ' ' + li_tag.text.strip()  # 构建完整标题
+                                url = a_tag['href']  # 获取链接URL
+                                if title not in self.article_urls['okx_api']:
+                                    self.article_urls['okx_api'][title] = url  # 存储到字典中
+                logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+
+                # 打印或保存 article_urls 字典
+                # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx_api'])}")
+                # logger.info(f"OKX: Article URLs: {self.article_urls['okx_api']}")
+
+            except Exception as e:
+                logger.error(f"Error parsing HTML: {e}")
+
+        if exchange == 'okx':
+            app_data_selector = 'li.index_article__15dX1'
+            app_data_text = response.css(app_data_selector).extract()
+            if not app_data_text:
+                logger.error(f"No data found for {exchange}")
+                return
+            
+            for article_html in app_data_text:
+                article_url = response.urljoin(article_html.split('href="')[1].split('"')[0])
+                article_title = article_html.split('index_title__6wUnB">')[1].split('</div>')[0]
+                
+                if article_title not in self.article_urls['okx']:
+                    self.article_urls['okx'][article_title] = article_url
+                    # logger.info(f"OKX: New article URL: {article_url}")
+                else:
+                    logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+
+            # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx'])}")
+            # logger.info(f"OKX: Article URLs: {self.article_urls['okx']}")
+                    
+        if exchange == 'okx_announcements-api':
+            app_data_selector = 'li.index_article__15dX1'
+            app_data_text = response.css(app_data_selector).extract()
+            if not app_data_text:
+                logger.error(f"No data found for {exchange}")
+                return
+            
+            for article_html in app_data_text:
+                article_url = response.urljoin(article_html.split('href="')[1].split('"')[0])
+                article_title = article_html.split('index_title__6wUnB">')[1].split('</div>')[0]
+                
+                if article_title not in self.article_urls['okx_announcements-api']:
+                    self.article_urls['okx_announcements-api'][article_title] = article_url
+                    # logger.info(f"OKX: New article URL: {article_url}")
+                else:
+                    logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+
+            # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx_announcements-api'])}")
+            # logger.info(f"OKX: Article URLs: {self.article_urls['okx_announcements-api']}")
 
         if exchange == 'bybit_delist':
             app_data_selector = 'div.article-item'
@@ -70,18 +288,19 @@ class Spider(scrapy.Spider):
             if not app_data_text:
                 logger.error("No data found")
                 return
-            
+                        
             for idx, app_data in enumerate(app_data_text):
                 article_title = app_data.css('.article-item-title span::text').get()
                 article_url = response.urljoin(app_data.css(f'{app_data_selector}[data-cy="announcement-{idx}"]::attr(href)').get())
                 if article_title and article_url:
                     if article_title not in self.article_urls['bybit_delist']:
                         self.article_urls['bybit_delist'][article_title] = article_url
-                        self.logger.info(f"Bybit: New article URL: {article_url}")
+                        # self.logger.info(f"Bybit: New article URL: {article_url}")
                     else:
                         self.logger.info(f"Bybit: Duplicate article found: {article_title}, skipping")
                 else:
                     logger.error(f"Missing title or URL in article: {app_data}")
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
            
         if exchange == 'bybit':
             app_data_selector = 'div.article-item'
@@ -100,6 +319,7 @@ class Spider(scrapy.Spider):
                         self.logger.info(f"Bybit: Duplicate article found: {article_title}, skipping")
                 else:
                     logger.error(f"Missing title or URL in article: {app_data}")
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
         if exchange == 'gate':
             articles = response.css('div.article-list-item')
@@ -120,49 +340,11 @@ class Spider(scrapy.Spider):
                         logger.error(f"Missing title or URL in article: {article}")
                 except Exception as e:
                     logger.error(f"Error parsing article: {article}. Error: {e}")
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+
 
             # logger.info(f"Gate: Total unique articles: {len(self.article_urls['gate'])}")
             # logger.info(f"Gate: Article URLs: {self.article_urls['gate']}")
-
-        if exchange == 'okx_announcements-api':
-            app_data_selector = 'li.index_article__15dX1'
-            app_data_text = response.css(app_data_selector).extract()
-            if not app_data_text:
-                logger.error(f"No data found for {exchange}")
-                return
-            
-            for article_html in app_data_text:
-                article_url = response.urljoin(article_html.split('href="')[1].split('"')[0])
-                article_title = article_html.split('index_title__6wUnB">')[1].split('</div>')[0]
-                
-                if article_title not in self.article_urls['okx_announcements-api']:
-                    self.article_urls['okx_announcements-api'][article_title] = article_url
-                    # logger.info(f"OKX: New article URL: {article_url}")
-                else:
-                    logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
-
-            # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx_announcements-api'])}")
-            # logger.info(f"OKX: Article URLs: {self.article_urls['okx_announcements-api']}")
-                    
-        if exchange == 'okx':
-            app_data_selector = 'li.index_article__15dX1'
-            app_data_text = response.css(app_data_selector).extract()
-            if not app_data_text:
-                logger.error(f"No data found for {exchange}")
-                return
-            
-            for article_html in app_data_text:
-                article_url = response.urljoin(article_html.split('href="')[1].split('"')[0])
-                article_title = article_html.split('index_title__6wUnB">')[1].split('</div>')[0]
-                
-                if article_title not in self.article_urls['okx']:
-                    self.article_urls['okx'][article_title] = article_url
-                    # logger.info(f"OKX: New article URL: {article_url}")
-                else:
-                    logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
-
-            # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx'])}")
-            # logger.info(f"OKX: Article URLs: {self.article_urls['okx']}")
 
         if exchange == 'binance':
             app_data_selector = '//*[@id="__APP_DATA"]/text()'
@@ -193,10 +375,37 @@ class Spider(scrapy.Spider):
                         # logger.info(f"{exchange}: New article URL: {article_url}")
                     else:
                         logger.info(f"{exchange}: Duplicate article found: {article_code}, skipping")
-
+            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+        
         # 打印或保存 article_urls 字典
-        logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
-        logger.info(f"{exchange}: Article URLs: {self.article_urls[exchange]}")
+        # logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
+        # logger.info(f"{exchange}: Article URLs: {self.article_urls[exchange]}")
+                        
+        for exchange, articles in self.article_urls.items():
+            file_path = f'{exchange}.csv'
+            existing_titles = set()
+            if os.path.exists(file_path):
+                with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+                    reader = csv.DictReader(csvfile)
+                    for row in reader:
+                        existing_titles.add(row['Title'])
+            with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
+                fieldnames = ['Title', 'URL']
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                if csvfile.tell() == 0:
+                    writer.writeheader()
+                new_articles_count = 0
+                new_articles = []
+                for title, url in articles.items():
+                    if title not in existing_titles:
+                        writer.writerow({'Title': title, 'URL': url})
+                        new_articles.append({'Title': title, 'URL': url})
+                        new_articles_count += 1
+                logger.info(f"Total new articles for {exchange}: {new_articles_count}")
+                for article in new_articles:
+                    message = f"New announcement from {exchange}:\nTitle: {article['Title']}\nURL: {article['URL']}"
+            message = 'hello'
+            self.telegram.send_message(message)
 
 if __name__ == "__main__":
     process = CrawlerProcess()
