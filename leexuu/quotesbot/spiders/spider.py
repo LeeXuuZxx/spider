@@ -9,22 +9,24 @@ from bs4 import BeautifulSoup
 import csv
 import time
 from ctx.telegram import Telegram
+import aiohttp
+import asyncio
 
 class Spider(scrapy.Spider):
     name = "Spider"
 
     urls = {
-        'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
+        # 'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
         'binance_api': 'https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/CHANGELOG',
-        'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
-        'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
-        'okx_api': 'https://www.okx.com/docs-v5/log_zh/#upcoming-changes-copy-trading-restriction-fucntion',
-        'gate': 'https://www.gate.io/zh/announcements',
-        'gate_api': 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81',
-        'bitget': 'https://api.bitget.com/api/v2/public/annoucements',
-        'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
-        'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
-        'bybit_api': 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5',
+        # 'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
+        # 'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
+        # 'okx_api': 'https://www.okx.com/docs-v5/log_zh/#upcoming-changes-copy-trading-restriction-fucntion',
+        # 'gate': 'https://www.gate.io/zh/announcements',
+        # 'gate_api': 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81',
+        # 'bitget': 'https://api.bitget.com/api/v2/public/annoucements',
+        # 'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
+        # 'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
+        # 'bybit_api': 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5',
     }
 
     custom_settings = {
@@ -68,6 +70,8 @@ class Spider(scrapy.Spider):
                     time.sleep(10)
                     # logger.info(f"已爬取 {exchange} 公告")
                     # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+
+            
 
 
     def bitget(self, url):
@@ -377,35 +381,53 @@ class Spider(scrapy.Spider):
                         logger.info(f"{exchange}: Duplicate article found: {article_code}, skipping")
             logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
         
+        asyncio.run(self.save_to_csv())
+
         # 打印或保存 article_urls 字典
         # logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
         # logger.info(f"{exchange}: Article URLs: {self.article_urls[exchange]}")
-                        
-        for exchange, articles in self.article_urls.items():
-            file_path = f'{exchange}.csv'
-            existing_titles = set()
-            if os.path.exists(file_path):
-                with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
-                    reader = csv.DictReader(csvfile)
-                    for row in reader:
-                        existing_titles.add(row['Title'])
-            with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
-                fieldnames = ['Title', 'URL']
-                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-                if csvfile.tell() == 0:
-                    writer.writeheader()
-                new_articles_count = 0
-                new_articles = []
-                for title, url in articles.items():
-                    if title not in existing_titles:
-                        writer.writerow({'Title': title, 'URL': url})
-                        new_articles.append({'Title': title, 'URL': url})
-                        new_articles_count += 1
-                logger.info(f"Total new articles for {exchange}: {new_articles_count}")
-                for article in new_articles:
-                    message = f"New announcement from {exchange}:\nTitle: {article['Title']}\nURL: {article['URL']}"
-            message = 'hello'
-            self.telegram.send_message(message)
+    async def send_telegram_message(self, message):
+        url = f"https://api.telegram.org/bot{self.TELEGRAM_BOT_TOKEN}/sendMessage"
+        data = {
+            "chat_id": self.TELEGRAM_CHAT_ID,
+            "text": message,
+            "parse_mode": "HTML"
+        }
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(url, data=data) as response:
+                    response_text = await response.text()
+                    response.raise_for_status()
+        except aiohttp.ClientError as e:
+            logger.error(f"Error sending message to Telegram: {e}")
+
+    async def save_to_csv(self):
+        try:
+            for exchange, articles in self.article_urls.items():
+                file_path = f'{exchange}.csv'
+                existing_titles = set()
+                if os.path.exists(file_path):
+                    with open(file_path, 'r', newline='', encoding='utf-8') as csvfile:
+                        reader = csv.DictReader(csvfile)
+                        for row in reader:
+                            existing_titles.add(row['Title'])
+                with open(file_path, 'a', newline='', encoding='utf-8') as csvfile:
+                    fieldnames = ['Title', 'URL']
+                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                    if csvfile.tell() == 0:
+                        writer.writeheader()
+                    new_articles_count = 0
+                    new_articles = []
+                    for title, url in articles.items():
+                        if title not in existing_titles:
+                            writer.writerow({'Title': title, 'URL': url})
+                            new_articles.append({'Title': title, 'URL': url})
+                            new_articles_count += 1
+                    for article in new_articles:
+                        message = f"New announcement from {exchange}:\nTitle: {article['Title']}\nURL: {article['URL']}"
+                        await self.send_telegram_message(message)
+        except Exception as e:
+            logger.error(f"Error saving to CSV: {e}")
 
 if __name__ == "__main__":
     process = CrawlerProcess()
