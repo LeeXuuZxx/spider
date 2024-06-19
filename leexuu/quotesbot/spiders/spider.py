@@ -8,7 +8,6 @@ import requests
 from bs4 import BeautifulSoup
 import csv
 import time
-from ctx.telegram import Telegram
 import aiohttp
 import asyncio
 
@@ -23,7 +22,7 @@ class Spider(scrapy.Spider):
         # 'okx_api': 'https://www.okx.com/docs-v5/log_zh/#upcoming-changes-copy-trading-restriction-fucntion',
         # 'gate': 'https://www.gate.io/zh/announcements',
         # 'gate_api': 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81',
-        # 'bitget': 'https://api.bitget.com/api/v2/public/annoucements',
+        'bitget': 'https://api.bitget.com/api/v2/public/annoucements',
         # 'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
         # 'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
         # 'bybit_api': 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5',
@@ -46,21 +45,22 @@ class Spider(scrapy.Spider):
     
     TELEGRAM_BOT_TOKEN = '7283290474:AAHnBvxcxlYqQFBa4r2RjykTee8H6eQAgSQ'
     TELEGRAM_CHAT_ID = '2115436972'
-    telegram = Telegram(token=TELEGRAM_BOT_TOKEN,chat_id=TELEGRAM_CHAT_ID)
 
     # 用于存储公告URL的字典，避免重复
     article_urls = {'binance': {}, 'binance_api': {}, 'okx': {}, 'okx_announcements-api': {}, 'okx_api': {}, 'gate': {}, 'gate_api': {}, 'bitget': {}, 'bybit': {}, 'bybit_delist': {}, 'bybit_api': {}}
 
     def start_requests(self):
-        while True:
+        # while True:
             for exchange, url in self.urls.items():
                 if exchange == 'bitget':
+                    logger.info(f"正在爬取 {exchange} 公告")
                     self.bitget(url)
                     time.sleep(10)
                     # logger.info(f"已爬取 {exchange} 公告")
                     # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
                     # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
                 else:
+                    logger.info(f"正在爬取 {exchange} 公告")
                     yield scrapy.Request(url=url, callback=self.parse, meta={'exchange': exchange}, headers={
                         'Referer': 'https://www.google.com/',
                         'Accept-Language': 'en-US,en;q=0.9',
@@ -92,6 +92,9 @@ class Spider(scrapy.Spider):
             # 打印或保存 article_urls 字典
             # logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
             # logger.info(f"{exchange}: Article URLs: {self.article_urls[exchange]}")
+            
+            asyncio.run(self.save_to_csv())
+
 
         except requests.exceptions.RequestException as e:
             print(f"Request error: {e}")
@@ -403,6 +406,7 @@ class Spider(scrapy.Spider):
 
     async def save_to_csv(self):
         try:
+            logger.info("正在保存数据到 CSV 文件...")
             for exchange, articles in self.article_urls.items():
                 file_path = f'{exchange}.csv'
                 existing_titles = set()
@@ -430,9 +434,11 @@ class Spider(scrapy.Spider):
             logger.error(f"Error saving to CSV: {e}")
 
 if __name__ == "__main__":
-    process = CrawlerProcess()
-    process.crawl(Spider)
-    process.start()
+    logger.info("正在启动爬虫...")
+    while True: #没有一直循环,bitget的公告没有完全写入就停了
+        process = CrawlerProcess()
+        process.crawl(Spider)
+        process.start()
 
 
 

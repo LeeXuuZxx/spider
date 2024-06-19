@@ -19,7 +19,7 @@ NEWSPIDER_MODULE = 'quotesbot.spiders'
 #USER_AGENT = 'quotesbot (+http://www.yourdomain.com)'
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+# ROBOTSTXT_OBEY = True
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32
@@ -49,6 +49,7 @@ ROBOTSTXT_OBEY = True
 #SPIDER_MIDDLEWARES = {
 #    'quotesbot.middlewares.MyCustomSpiderMiddleware': 543,
 #}
+DUPEFILTER_CLASS = 'scrapy.dupefilters.BaseDupeFilter'
 
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
