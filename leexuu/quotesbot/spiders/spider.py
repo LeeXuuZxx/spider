@@ -15,17 +15,17 @@ class Spider(scrapy.Spider):
     name = "Spider"
 
     urls = {
-        # 'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
+        'binance': 'https://www.binance.com/zh-CN/support/announcement/%E4%B8%8B%E6%9E%B6%E8%AE%AF%E6%81%AF?c=161&navId=161&hl=zh-CN',
         'binance_api': 'https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/CHANGELOG',
-        # 'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
-        # 'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
-        # 'okx_api': 'https://www.okx.com/docs-v5/log_zh/#upcoming-changes-copy-trading-restriction-fucntion',
-        # 'gate': 'https://www.gate.io/zh/announcements',
-        # 'gate_api': 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81',
+        'okx': 'https://www.okx.com/zh-hans/help/section/announcements-latest-announcements',
+        'okx_announcements-api': 'https://www.okx.com/zh-hans/help/section/announcements-api',
+        'okx_api': 'https://www.okx.com/docs-v5/log_zh/#upcoming-changes-copy-trading-restriction-fucntion',
+        'gate': 'https://www.gate.io/zh/announcements',
+        'gate_api': 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81',
         'bitget': 'https://api.bitget.com/api/v2/public/annoucements',
-        # 'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
-        # 'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
-        # 'bybit_api': 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5',
+        'bybit': 'https://announcements.bybit.com/zh-MY/?page=1&category=new_crypto',
+        'bybit_delist': 'https://announcements.bybit.com/zh-MY/?page=1&category=delistings',
+        'bybit_api': 'https://bybit-exchange.github.io/docs/zh-TW/changelog/v5',
     }
 
     custom_settings = {
@@ -49,27 +49,29 @@ class Spider(scrapy.Spider):
     # 用于存储公告URL的字典，避免重复
     article_urls = {'binance': {}, 'binance_api': {}, 'okx': {}, 'okx_announcements-api': {}, 'okx_api': {}, 'gate': {}, 'gate_api': {}, 'bitget': {}, 'bybit': {}, 'bybit_delist': {}, 'bybit_api': {}}
 
+    sleep_time = 3600
+    count_times = 0
     def start_requests(self):
-        # while True:
-            for exchange, url in self.urls.items():
-                if exchange == 'bitget':
-                    logger.info(f"正在爬取 {exchange} 公告")
-                    self.bitget(url)
-                    time.sleep(10)
-                    # logger.info(f"已爬取 {exchange} 公告")
-                    # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
-                    # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
-                else:
-                    logger.info(f"正在爬取 {exchange} 公告")
-                    yield scrapy.Request(url=url, callback=self.parse, meta={'exchange': exchange}, headers={
-                        'Referer': 'https://www.google.com/',
-                        'Accept-Language': 'en-US,en;q=0.9',
-                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                        'Connection': 'keep-alive',
-                    })
-                    time.sleep(10)
-                    # logger.info(f"已爬取 {exchange} 公告")
-                    # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+        for exchange, url in self.urls.items():
+            # logger.info("开始爬取")
+            if exchange == 'bitget':
+                # logger.info(f"正在爬取 {exchange} 公告")
+                self.bitget(url)
+                # logger.info(f"已爬取 {exchange} 公告")
+                # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                # logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
+            else:
+                # logger.info(f"正在爬取 {exchange} 公告")
+                yield scrapy.Request(url=url, callback=self.parse, meta={'exchange': exchange}, headers={
+                    'Referer': 'https://www.google.com/',
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                    'Connection': 'keep-alive',
+                })
+                # logger.info(f"已爬取 {exchange} 公告")
+        self.count_times += 1
+        logger.info(f"已爬取 {self.count_times} 次")
+        logger.info(f"当前时间：{time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())}")
 
             
 
@@ -98,7 +100,28 @@ class Spider(scrapy.Spider):
 
         except requests.exceptions.RequestException as e:
             print(f"Request error: {e}")
-                    
+
+
+
+    def check_loop_start(self):
+        if self.is_finished():  # 当队列中没有请求时休眠并重启
+            self.logger.info('本轮采集完毕，%s秒后开始下一轮采集' % self.sleep_time)
+            time.sleep(self.sleep_time)
+            return self.start_requests()
+        return []
+    
+
+    def is_finished(self):  # 检查队列中是否还有请求
+        if self.crawler.engine.downloader.active:
+            return False
+        if self.crawler.engine.slot.start_requests is not None:
+            return False
+        if self.crawler.engine.slot.scheduler.has_pending_requests():
+            return False
+        return True
+
+
+
     def parse(self, response):
         exchange = response.meta['exchange']
 
@@ -133,7 +156,7 @@ class Spider(scrapy.Spider):
                                     if title not in self.article_urls[exchange]:
                                         self.article_urls[exchange][title] = url
                     sibling = sibling.find_next_sibling()
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
         if exchange == 'gate_api':
             app_data_selector = 'div.content-block__cont'
@@ -161,7 +184,7 @@ class Spider(scrapy.Spider):
                                 url = 'https://www.gate.io/docs/developers/apiv4/zh_CN/#%E6%8A%80%E6%9C%AF%E6%94%AF%E6%8C%81'
                                 if title not in self.article_urls['gate_api']:
                                     self.article_urls['gate_api'][title] = url
-                logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
                 # logger.info(self.article_urls['gate_api'])
 
@@ -196,7 +219,7 @@ class Spider(scrapy.Spider):
                             url = 'https://developers.binance.com/docs/zh-CN/binance-spot-api-docs/CHANGELOG'
                             if title not in self.article_urls['binance_api']:
                                 self.article_urls['binance_api'][title] = url
-                logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
                 
                 # 打印或保存 article_urls 字典
                 # logger.info(f"binance_api: Total unique articles: {len(self.article_urls['binance_api'])}")
@@ -238,7 +261,7 @@ class Spider(scrapy.Spider):
                                 url = a_tag['href']  # 获取链接URL
                                 if title not in self.article_urls['okx_api']:
                                     self.article_urls['okx_api'][title] = url  # 存储到字典中
-                logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
                 # 打印或保存 article_urls 字典
                 # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx_api'])}")
@@ -261,9 +284,9 @@ class Spider(scrapy.Spider):
                 if article_title not in self.article_urls['okx']:
                     self.article_urls['okx'][article_title] = article_url
                     # logger.info(f"OKX: New article URL: {article_url}")
-                else:
-                    logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                # else:
+                #     logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
             # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx'])}")
             # logger.info(f"OKX: Article URLs: {self.article_urls['okx']}")
@@ -282,9 +305,9 @@ class Spider(scrapy.Spider):
                 if article_title not in self.article_urls['okx_announcements-api']:
                     self.article_urls['okx_announcements-api'][article_title] = article_url
                     # logger.info(f"OKX: New article URL: {article_url}")
-                else:
-                    logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                # else:
+                #     logger.info(f"OKX: Duplicate article found: {article_title}, skipping")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
             # logger.info(f"OKX: Total unique articles: {len(self.article_urls['okx_announcements-api'])}")
             # logger.info(f"OKX: Article URLs: {self.article_urls['okx_announcements-api']}")
@@ -303,11 +326,11 @@ class Spider(scrapy.Spider):
                     if article_title not in self.article_urls['bybit_delist']:
                         self.article_urls['bybit_delist'][article_title] = article_url
                         # self.logger.info(f"Bybit: New article URL: {article_url}")
-                    else:
-                        self.logger.info(f"Bybit: Duplicate article found: {article_title}, skipping")
+                    # else:
+                    #     self.logger.info(f"Bybit: Duplicate article found: {article_title}, skipping")
                 else:
                     logger.error(f"Missing title or URL in article: {app_data}")
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
            
         if exchange == 'bybit':
             app_data_selector = 'div.article-item'
@@ -322,11 +345,11 @@ class Spider(scrapy.Spider):
                     if article_title not in self.article_urls['bybit']:
                         self.article_urls['bybit'][article_title] = article_url
                         # self.logger.info(f"Bybit: New article URL: {article_url}")
-                    else:
-                        self.logger.info(f"Bybit: Duplicate article found: {article_title}, skipping")
+                    # else:
+                    #     self.logger.info(f"Bybit: Duplicate article found: {article_title}, skipping")
                 else:
                     logger.error(f"Missing title or URL in article: {app_data}")
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
         if exchange == 'gate':
             articles = response.css('div.article-list-item')
@@ -341,13 +364,13 @@ class Spider(scrapy.Spider):
                         if article_title not in self.article_urls['gate']:
                             self.article_urls['gate'][article_title] = article_url
                             # logger.info(f"Gate: New article URL: {article_url}")
-                        else:
-                            logger.info(f"Gate: Duplicate article found: {article_title}, skipping")
+                        # else:
+                        #     logger.info(f"Gate: Duplicate article found: {article_title}, skipping")
                     else:
                         logger.error(f"Missing title or URL in article: {article}")
                 except Exception as e:
                     logger.error(f"Error parsing article: {article}. Error: {e}")
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
 
             # logger.info(f"Gate: Total unique articles: {len(self.article_urls['gate'])}")
@@ -380,11 +403,16 @@ class Spider(scrapy.Spider):
                         article_url = f"https://www.{exchange}.com/zh-CN/support/announcement/{title_encoded}-{article_code}"
                         self.article_urls[exchange][article['title']] = article_url
                         # logger.info(f"{exchange}: New article URL: {article_url}")
-                    else:
-                        logger.info(f"{exchange}: Duplicate article found: {article_code}, skipping")
-            logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
+                    # else:
+                    #     logger.info(f"{exchange}: Duplicate article found: {article_code}, skipping")
+            # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
         
         asyncio.run(self.save_to_csv())
+
+
+        for request in self.check_loop_start():
+            yield request
+
 
         # 打印或保存 article_urls 字典
         # logger.info(f"{exchange}: Total unique articles: {len(self.article_urls[exchange])}")
@@ -406,7 +434,7 @@ class Spider(scrapy.Spider):
 
     async def save_to_csv(self):
         try:
-            logger.info("正在保存数据到 CSV 文件...")
+            # logger.info("正在保存数据到 CSV 文件...")
             for exchange, articles in self.article_urls.items():
                 file_path = f'{exchange}.csv'
                 existing_titles = set()
@@ -430,15 +458,37 @@ class Spider(scrapy.Spider):
                     for article in new_articles:
                         message = f"New announcement from {exchange}:\nTitle: {article['Title']}\nURL: {article['URL']}"
                         await self.send_telegram_message(message)
+                        logger.info(message)
         except Exception as e:
             logger.error(f"Error saving to CSV: {e}")
+    
 
-if __name__ == "__main__":
-    logger.info("正在启动爬虫...")
-    while True: #没有一直循环,bitget的公告没有完全写入就停了
-        process = CrawlerProcess()
-        process.crawl(Spider)
-        process.start()
+    def next_parse(self, response):
+        for request in self.check_loop_start():
+            yield request
+
+
+
+
+# if __name__ == "__main__":
+#     logger.info("正在启动爬虫...")
+#     while True: #没有一直循环,bitget的公告没有完全写入就停了
+#         process = CrawlerProcess()
+#         process.crawl(Spider)
+#         process.start()
+
+
+# async def start_crawler():
+#     process = CrawlerProcess()
+#     process.crawl(Spider)
+#     process.start()
+
+# if __name__ == "__main__":
+#     logger.info("正在启动爬虫...")
+#     loop = asyncio.get_event_loop()
+#     while True:
+#         loop.run_until_complete(start_crawler())
+#         time.sleep(300)  # wait 5 minutes before next run
 
 
 

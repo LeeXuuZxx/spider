@@ -13,6 +13,11 @@ BOT_NAME = 'quotesbot'
 
 SPIDER_MODULES = ['quotesbot.spiders']
 NEWSPIDER_MODULE = 'quotesbot.spiders'
+# 启用 logger
+LOG_LEVEL = 'INFO'
+
+DUPEFILTER_CLASS = 'scrapy.dupefilters.BaseDupeFilter'
+
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
@@ -49,7 +54,6 @@ NEWSPIDER_MODULE = 'quotesbot.spiders'
 #SPIDER_MIDDLEWARES = {
 #    'quotesbot.middlewares.MyCustomSpiderMiddleware': 543,
 #}
-DUPEFILTER_CLASS = 'scrapy.dupefilters.BaseDupeFilter'
 
 # Enable or disable downloader middlewares
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html
@@ -91,8 +95,8 @@ DUPEFILTER_CLASS = 'scrapy.dupefilters.BaseDupeFilter'
 
 # Enable and configure HTTP caching (disabled by default)
 # See http://scrapy.readthedocs.org/en/latest/topics/downloader-middleware.html#httpcache-middleware-settings
-#HTTPCACHE_ENABLED = True
-#HTTPCACHE_EXPIRATION_SECS = 0
-#HTTPCACHE_DIR = 'httpcache'
-#HTTPCACHE_IGNORE_HTTP_CODES = []
-#HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
+HTTPCACHE_ENABLED = True
+HTTPCACHE_EXPIRATION_SECS = 0
+HTTPCACHE_DIR = 'httpcache'
+HTTPCACHE_IGNORE_HTTP_CODES = []
+HTTPCACHE_STORAGE = 'scrapy.extensions.httpcache.FilesystemCacheStorage'
