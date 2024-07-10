@@ -249,7 +249,6 @@ class Spider(scrapy.Spider):
                             url = base_url + a_tag['href']
                             if title not in self.article_urls['okx_api']:
                                 self.article_urls['okx_api'][title] = url
-                                time.sleep(1)
 
             # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
