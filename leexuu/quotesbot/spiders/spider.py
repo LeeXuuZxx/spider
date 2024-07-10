@@ -379,7 +379,6 @@ class Spider(scrapy.Spider):
         if exchange == 'binance': #权限不够，只能拿__APP_DATA
             app_data_selector = '//*[@id="__APP_DATA"]/text()'
             app_data_text = response.xpath(app_data_selector).get()
-            logger.info(app_data_text)
             if not app_data_text:
                 logger.error(f"No data found for {exchange}")
                 return
@@ -409,7 +408,7 @@ class Spider(scrapy.Spider):
             # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
         
         asyncio.run(self.save_to_csv())
-        
+
         for request in self.check_loop_start():
             yield request
 
