@@ -296,7 +296,6 @@ class Spider(scrapy.Spider):
                     # logger.info(f"Title: {full_title}, URL: {url}")
                     if full_title not in self.article_urls['okx_announcements-api']:
                         self.article_urls['okx_announcements-api'][full_title] = url
-                        time.sleep(1)
 
             # logger.info(f"当前交易所{exchange}爬取公告数量：{len(self.article_urls[exchange])}")
 
@@ -322,7 +321,6 @@ class Spider(scrapy.Spider):
                     # logger.info(f"Title: {full_title}, URL: {url}")
                     if full_title not in self.article_urls['bybit_delist']:
                         self.article_urls['bybit_delist'][full_title] = url
-                        time.sleep(1)
             # logger.info(f"当前交易所 {exchange} 爬取公告数量：{len(announcements)}")
            
         if exchange == 'bybit':
@@ -347,7 +345,6 @@ class Spider(scrapy.Spider):
                     # logger.info(f"Title: {full_title}, URL: {url}")
                     if full_title not in self.article_urls['bybit']:
                         self.article_urls['bybit'][full_title] = url
-                        time.sleep(1)
             # logger.info(f"当前交易所 {exchange} 爬取公告数量：{len(announcements)}")
            
         if exchange == 'gate':
@@ -366,14 +363,10 @@ class Spider(scrapy.Spider):
                 date_tag = announcement.select_one('span.article-list-info-timer span')
                 if title_tag and date_tag:
                     title = title_tag.get_text(strip=True)
-                    published_date = date_tag.get_text(strip=True)
-                    full_title = f"{title}发布于 {published_date}"
                     relative_url = announcement.select_one('a.article-list-item-title')['href']
                     url = f"{base_url}{relative_url}"
-                    # logger.info(f"Title: {full_title}, URL: {url}")
-                    if full_title not in self.article_urls['gate']:
-                        self.article_urls['gate'][full_title] = url
-                        time.sleep(1)
+                    if title not in self.article_urls['gate']:
+                        self.article_urls['gate'][title] = url
             # logger.info(f"当前交易所 {exchange} 爬取公告数量：{len(announcements)}")
 
         if exchange == 'binance': #权限不够，只能拿__APP_DATA
